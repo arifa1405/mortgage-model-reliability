@@ -20,11 +20,94 @@ def _normalize_code(value: object) -> str | None:
     return str(value).strip()
 
 
+def _create_high_ratio_warnings(
+    data: pd.DataFrame,
+    year: int,
+) -> pd.DataFrame:
+    """Flag high LTV or CLTV values without complete HARP support."""
+
+    ltv = pd.to_numeric(
+        data["ORIGINAL LOAN-TO-VALUE (LTV)"],
+        errors="coerce",
+    )
+
+    cltv = pd.to_numeric(
+        data[
+            "ORIGINAL COMBINED LOAN-TO-VALUE (CLTV)"
+        ],
+        errors="coerce",
+    )
+
+    high_ltv_mask = (
+        ltv.gt(105)
+        & ltv.ne(999)
+    )
+
+    high_cltv_mask = (
+        cltv.gt(105)
+        & cltv.ne(999)
+    )
+
+    harp_supported = (
+        data["HARP INDICATOR"]
+        .astype("string")
+        .str.strip()
+        .eq("Y")
+        .fillna(False)
+    )
+
+    pre_harp_sequence = (
+        data["PRE-HARP LOAN SEQUENCE NUMBER"]
+        .astype("string")
+        .str.strip()
+    )
+
+    pre_harp_supported = (
+        pre_harp_sequence.notna()
+        & pre_harp_sequence.ne("")
+    )
+
+    unsupported_high_ratio_mask = (
+        (high_ltv_mask | high_cltv_mask)
+        & ~(
+            harp_supported
+            & pre_harp_supported
+        )
+    )
+
+    warnings = data.loc[
+        unsupported_high_ratio_mask,
+        [
+            "LOAN IDENTIFIER",
+            "ORIGINAL LOAN-TO-VALUE (LTV)",
+            "ORIGINAL COMBINED LOAN-TO-VALUE (CLTV)",
+            "HARP INDICATOR",
+            "PRE-HARP LOAN SEQUENCE NUMBER",
+        ],
+    ].copy()
+
+    warnings.insert(
+        0,
+        "year",
+        year,
+    )
+
+    warnings["HIGH LTV FLAG"] = high_ltv_mask.loc[
+        unsupported_high_ratio_mask
+    ]
+
+    warnings["HIGH CLTV FLAG"] = high_cltv_mask.loc[
+        unsupported_high_ratio_mask
+    ]
+
+    return warnings
+
+
 def create_origination_quality_report(
     data: pd.DataFrame,
     year: int,
 ) -> dict[str, pd.DataFrame]:
-    """Create code, sentinel, and missingness quality reports."""
+    """Create code, sentinel, missingness, and high-ratio reports."""
 
     unexpected_code_rows = []
     sentinel_rows = []
@@ -80,10 +163,14 @@ def create_origination_quality_report(
             _normalize_code
         )
 
-        normalized_sentinel = _normalize_code(sentinel)
+        normalized_sentinel = _normalize_code(
+            sentinel
+        )
 
         sentinel_count = int(
-            normalized_values.eq(normalized_sentinel).sum()
+            normalized_values.eq(
+                normalized_sentinel
+            ).sum()
         )
 
         sentinel_rows.append(
@@ -135,8 +222,14 @@ def create_origination_quality_report(
         missingness_rows
     )
 
+    high_ratio_warnings = _create_high_ratio_warnings(
+        data=data,
+        year=year,
+    )
+
     return {
         "unexpected_codes": unexpected_codes,
         "sentinel_counts": sentinel_counts,
         "missingness": missingness,
+        "high_ratio_warnings": high_ratio_warnings,
     }
