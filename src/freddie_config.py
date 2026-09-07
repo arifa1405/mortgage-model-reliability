@@ -116,6 +116,10 @@ CATEGORICAL_SENTINELS = {
 }
 
 
+# Release 47 stores the first three postal-code digits; 000 is unknown.
+# It also maps non-Super-Conforming and non-HARP blanks to N, and maps
+# unavailable Special Eligibility Program code 9 to null. Nulls are
+# handled by missingness reporting rather than categorical code sets.
 POSTAL_CODE_WIDTH = 3
 POSTAL_CODE_SENTINEL = "000"
 
