@@ -42,14 +42,21 @@ def validate_origination(
             f"{missing_preserved_columns}"
         )
 
-    changed_raw_columns = [
-        column
-        for column in raw.columns
-        if (
-            column in cleaned.columns
-            and not raw[column].equals(cleaned[column])
-        )
-    ]
+    changed_raw_columns = []
+
+    for column in raw.columns:
+        if column not in cleaned.columns:
+            continue
+
+        try:
+            pd.testing.assert_series_equal(
+                raw[column].reset_index(drop=True),
+                cleaned[column].reset_index(drop=True),
+                check_dtype=False,
+                check_names=False,
+            )
+        except AssertionError:
+            changed_raw_columns.append(column)
 
     if changed_raw_columns:
         errors.append(
