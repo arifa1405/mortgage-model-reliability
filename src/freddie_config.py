@@ -1,5 +1,6 @@
 """Configuration for Freddie Mac annual sample processing."""
 
+
 ORIGINATION_COLUMNS = [
     "CLASSIC FICO",
     "FIRST PAYMENT DATE",
@@ -33,6 +34,7 @@ ORIGINATION_COLUMNS = [
     "INTEREST ONLY (I/O) INDICATOR",
     "VANTAGESCORE 4.0",
 ]
+
 
 # Maximum raw field lengths from the July 2026 Freddie Mac file layout.
 ORIGINATION_MAX_LENGTHS = {
@@ -69,6 +71,7 @@ ORIGINATION_MAX_LENGTHS = {
     "VANTAGESCORE 4.0": 4,
 }
 
+
 ORIGINATION_STRING_COLUMNS = {
     "FIRST TIME HOMEBUYER INDICATOR": "string",
     "OCCUPANCY STATUS": "string",
@@ -89,20 +92,49 @@ ORIGINATION_STRING_COLUMNS = {
 }
 
 
+# Numeric sentinel values that require corresponding clean columns.
 NUMERIC_SENTINELS = {
+    "CLASSIC FICO": 9999,
+    "MORTGAGE INSURANCE PERCENTAGE (MI %)": 999,
+    "NUMBER OF UNITS": 99,
+    "ORIGINAL COMBINED LOAN-TO-VALUE (CLTV)": 999,
     "ORIGINAL DEBT-TO-INCOME (DTI) RATIO": 999,
     "ORIGINAL LOAN-TO-VALUE (LTV)": 999,
-    "ORIGINAL COMBINED LOAN-TO-VALUE (CLTV)": 999,
+    "NUMBER OF BORROWERS": 99,
     "PROPERTY VALUATION METHOD": 7,
+    "VANTAGESCORE 4.0": 9999,
 }
 
 
+# Categorical sentinel values that require corresponding clean columns.
 CATEGORICAL_SENTINELS = {
     "FIRST TIME HOMEBUYER INDICATOR": "9",
+    "OCCUPANCY STATUS": "9",
+    "CHANNEL": "9",
+    "PROPERTY TYPE": "99",
+    "LOAN PURPOSE": "9",
 }
 
 
 POSTAL_CODE_WIDTH = 3
+POSTAL_CODE_SENTINEL = "000"
+
+
+# Freddie Mac disclosure-range transition beginning in 2018 Q2.
+RATIO_DISCLOSURE_CHANGE_YEAR = 2018
+RATIO_DISCLOSURE_CHANGE_QUARTER = 2
+
+PRIOR_LTV_MINIMUM = 6
+PRIOR_LTV_MAXIMUM = 105
+
+PRIOR_CLTV_MINIMUM = 6
+PRIOR_CLTV_MAXIMUM = 200
+
+EXPANDED_RATIO_MINIMUM = 1
+EXPANDED_RATIO_MAXIMUM = 998
+
+RATIO_SENTINEL = 999
+
 
 # Documented code sets from the Freddie Mac General User Guide.
 # Missing/null values are handled separately and are not included here.
@@ -117,6 +149,19 @@ DOCUMENTED_CODE_VALUES = {
         "2",
         "3",
         "4",
+        "99",
+    },
+    "NUMBER OF BORROWERS": {
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
         "99",
     },
     "OCCUPANCY STATUS": {
@@ -182,7 +227,7 @@ DOCUMENTED_CODE_VALUES = {
 }
 
 
-# Documented unavailable or unknown codes.
+# Documented unavailable, unknown, or not-applicable codes.
 # These are monitored even when they do not occur in a particular year.
 DOCUMENTED_SENTINELS = {
     "CLASSIC FICO": 9999,

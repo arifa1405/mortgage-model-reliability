@@ -4,34 +4,44 @@ import pandas as pd
 
 
 NUMERIC_SUMMARY_COLUMNS = {
-    "CLASSIC FICO": "FICO",
-    "ORIGINAL DEBT-TO-INCOME (DTI) RATIO_CLEAN": "DTI",
-    "ORIGINAL LOAN-TO-VALUE (LTV)_CLEAN": "LTV",
-    "ORIGINAL COMBINED LOAN-TO-VALUE (CLTV)_CLEAN": "CLTV",
-    "ORIGINAL UPB": "UPB",
-    "ORIGINAL INTEREST RATE": "INTEREST RATE",
-    "ORIGINAL LOAN TERM": "LOAN TERM",
-    "MORTGAGE INSURANCE PERCENTAGE (MI %)": "MI PERCENTAGE",
+    "CLASSIC FICO_CLEAN":
+        "FICO",
+    "ORIGINAL DEBT-TO-INCOME (DTI) RATIO_CLEAN":
+        "DTI",
+    "ORIGINAL LOAN-TO-VALUE (LTV)_CLEAN":
+        "LTV",
+    "ORIGINAL COMBINED LOAN-TO-VALUE (CLTV)_CLEAN":
+        "CLTV",
+    "ORIGINAL UPB":
+        "UPB",
+    "ORIGINAL INTEREST RATE":
+        "INTEREST RATE",
+    "ORIGINAL LOAN TERM":
+        "LOAN TERM",
+    "MORTGAGE INSURANCE PERCENTAGE (MI %)_CLEAN":
+        "MI PERCENTAGE",
+    "VANTAGESCORE 4.0_CLEAN":
+        "VANTAGESCORE 4.0",
 }
 
 
 CATEGORICAL_SUMMARY_COLUMNS = {
     "FIRST TIME HOMEBUYER INDICATOR_CLEAN":
         "FIRST TIME HOMEBUYER",
-    "NUMBER OF UNITS":
+    "NUMBER OF UNITS_CLEAN":
         "NUMBER OF UNITS",
-    "OCCUPANCY STATUS":
+    "OCCUPANCY STATUS_CLEAN":
         "OCCUPANCY STATUS",
-    "CHANNEL":
+    "CHANNEL_CLEAN":
         "CHANNEL",
     "PROPERTY STATE":
         "PROPERTY STATE",
-    "PROPERTY TYPE":
+    "PROPERTY TYPE_CLEAN":
         "PROPERTY TYPE",
-    "LOAN PURPOSE":
+    "LOAN PURPOSE_CLEAN":
         "LOAN PURPOSE",
-    "NUMBER OF BORROWERS":
-        "NUMBER OF BORROWERS",
+    "NUMBER OF BORROWERS GROUP_CLEAN":
+        "NUMBER OF BORROWERS GROUP",
 }
 
 
@@ -49,12 +59,15 @@ def create_numeric_summary(
 
     if missing_columns:
         raise KeyError(
-            f"Missing numeric summary columns: {missing_columns}"
+            "Missing numeric summary columns: "
+            f"{missing_columns}"
         )
 
     numeric_data = (
         data[list(NUMERIC_SUMMARY_COLUMNS)]
-        .rename(columns=NUMERIC_SUMMARY_COLUMNS)
+        .rename(
+            columns=NUMERIC_SUMMARY_COLUMNS
+        )
     )
 
     summary = (
@@ -70,7 +83,10 @@ def create_numeric_summary(
         )
     )
 
-    summary["missing"] = numeric_data.isna().sum()
+    summary["missing"] = (
+        numeric_data.isna().sum()
+    )
+
     summary["missing_percentage"] = (
         numeric_data.isna().mean() * 100
     )
@@ -78,10 +94,16 @@ def create_numeric_summary(
     summary = (
         summary
         .reset_index()
-        .rename(columns={"index": "variable"})
+        .rename(
+            columns={"index": "variable"}
+        )
     )
 
-    summary.insert(0, "year", year)
+    summary.insert(
+        0,
+        "year",
+        year,
+    )
 
     return summary[
         [
@@ -115,7 +137,8 @@ def create_categorical_summary(
 
     if missing_columns:
         raise KeyError(
-            f"Missing categorical summary columns: {missing_columns}"
+            "Missing categorical summary columns: "
+            f"{missing_columns}"
         )
 
     summary_rows = []
@@ -129,7 +152,9 @@ def create_categorical_summary(
             .fillna("<MISSING>")
         )
 
-        counts = values.value_counts(dropna=False)
+        counts = values.value_counts(
+            dropna=False
+        )
 
         for category, count in counts.items():
             summary_rows.append(
@@ -139,12 +164,16 @@ def create_categorical_summary(
                     "category": category,
                     "count": int(count),
                     "percentage": (
-                        float(count) / len(data) * 100
+                        float(count)
+                        / len(data)
+                        * 100
                     ),
                 }
             )
 
-    return pd.DataFrame(summary_rows)
+    return pd.DataFrame(
+        summary_rows
+    )
 
 
 def create_annual_summary(
@@ -154,6 +183,12 @@ def create_annual_summary(
     """Create all standardized summaries for one year."""
 
     return {
-        "numeric": create_numeric_summary(data, year),
-        "categorical": create_categorical_summary(data, year),
+        "numeric": create_numeric_summary(
+            data,
+            year,
+        ),
+        "categorical": create_categorical_summary(
+            data,
+            year,
+        ),
     }
