@@ -427,6 +427,120 @@ def _create_definition_warnings(
                 }
             )
 
+    # The Pre-HARP identifier is populated only for Relief Refinance
+    # loans, and all other loans must leave it blank.
+    if {
+        "HARP INDICATOR",
+        "PRE-HARP LOAN SEQUENCE NUMBER",
+    }.issubset(data.columns):
+        harp_indicator = (
+            data["HARP INDICATOR"]
+            .astype("string")
+            .str.strip()
+            .eq("Y")
+            .fillna(False)
+        )
+
+        pre_harp_sequence = (
+            data[
+                "PRE-HARP LOAN SEQUENCE NUMBER"
+            ]
+            .astype("string")
+            .str.strip()
+        )
+
+        pre_harp_present = (
+            pre_harp_sequence.notna()
+            & pre_harp_sequence.ne("")
+        )
+
+        harp_without_link = (
+            harp_indicator
+            & ~pre_harp_present
+        )
+
+        link_without_harp = (
+            ~harp_indicator
+            & pre_harp_present
+        )
+
+        if harp_without_link.any():
+            warning_rows.append(
+                {
+                    "year": year,
+                    "column": (
+                        "HARP INDICATOR / "
+                        "PRE-HARP LOAN SEQUENCE NUMBER"
+                    ),
+                    "unexpected_value": (
+                        "Y_WITHOUT_PRE_HARP_ID"
+                    ),
+                    "count": int(
+                        harp_without_link.sum()
+                    ),
+                    "rule": (
+                        "HARP indicator Y requires a "
+                        "Pre-HARP loan sequence number"
+                    ),
+                }
+            )
+
+        if link_without_harp.any():
+            warning_rows.append(
+                {
+                    "year": year,
+                    "column": (
+                        "HARP INDICATOR / "
+                        "PRE-HARP LOAN SEQUENCE NUMBER"
+                    ),
+                    "unexpected_value": (
+                        "PRE_HARP_ID_WITHOUT_Y"
+                    ),
+                    "count": int(
+                        link_without_harp.sum()
+                    ),
+                    "rule": (
+                        "Pre-HARP loan sequence number "
+                        "is populated only when the "
+                        "HARP indicator is Y"
+                    ),
+                }
+            )
+
+        # Freddie Mac discloses DTI as unavailable (999) for
+        # all HARP/Relief Refinance loans.
+        dti_column = (
+            "ORIGINAL DEBT-TO-INCOME (DTI) RATIO"
+        )
+
+        if dti_column in data.columns:
+            dti_code = data[
+                dti_column
+            ].map(_normalize_code)
+
+            populated_harp_dti = (
+                harp_indicator
+                & dti_code.ne("999")
+            )
+
+            if populated_harp_dti.any():
+                warning_rows.append(
+                    {
+                        "year": year,
+                        "column": dti_column,
+                        "unexpected_value": (
+                            "POPULATED_FOR_HARP"
+                        ),
+                        "count": int(
+                            populated_harp_dti.sum()
+                        ),
+                        "rule": (
+                            "HARP loan DTI must use "
+                            "unavailable code 999"
+                        ),
+                    }
+                )
+
     valuation_column = "PROPERTY VALUATION METHOD"
 
     if valuation_column in data.columns:
