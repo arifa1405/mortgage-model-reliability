@@ -51,83 +51,79 @@ def run_origination_pipeline(
         exist_ok=True,
     )
 
-    cleaned_path = (
-        output_directory
-        / f"origination_{year}_clean.parquet"
-    )
-
-    numeric_summary_path = (
-        output_directory
-        / f"origination_{year}_numeric_summary.csv"
-    )
-
-    categorical_summary_path = (
-        output_directory
-        / f"origination_{year}_categorical_summary.csv"
-    )
-
-    unexpected_codes_path = (
-        output_directory
-        / f"origination_{year}_unexpected_codes.csv"
-    )
-
-    sentinel_counts_path = (
-        output_directory
-        / f"origination_{year}_sentinel_counts.csv"
-    )
-
-    missingness_path = (
-        output_directory
-        / f"origination_{year}_missingness.csv"
-    )
-
-    high_ratio_warnings_path = (
-        output_directory
-        / f"origination_{year}_high_ratio_warnings.csv"
-    )
-
-    validation_path = (
-        output_directory
-        / f"origination_{year}_validation.json"
-    )
+    output_paths = {
+        "cleaned": (
+            output_directory
+            / f"origination_{year}_clean.parquet"
+        ),
+        "numeric_summary": (
+            output_directory
+            / f"origination_{year}_numeric_summary.csv"
+        ),
+        "categorical_summary": (
+            output_directory
+            / f"origination_{year}_categorical_summary.csv"
+        ),
+        "unexpected_codes": (
+            output_directory
+            / f"origination_{year}_unexpected_codes.csv"
+        ),
+        "sentinel_counts": (
+            output_directory
+            / f"origination_{year}_sentinel_counts.csv"
+        ),
+        "missingness": (
+            output_directory
+            / f"origination_{year}_missingness.csv"
+        ),
+        "numeric_range_warnings": (
+            output_directory
+            / f"origination_{year}_numeric_range_warnings.csv"
+        ),
+        "definition_warnings": (
+            output_directory
+            / f"origination_{year}_definition_warnings.csv"
+        ),
+        "ratio_warnings": (
+            output_directory
+            / f"origination_{year}_ratio_warnings.csv"
+        ),
+        "validation": (
+            output_directory
+            / f"origination_{year}_validation.json"
+        ),
+    }
 
     cleaned.to_parquet(
-        cleaned_path,
+        output_paths["cleaned"],
         index=False,
         engine="pyarrow",
     )
 
     summaries["numeric"].to_csv(
-        numeric_summary_path,
+        output_paths["numeric_summary"],
         index=False,
     )
 
     summaries["categorical"].to_csv(
-        categorical_summary_path,
+        output_paths["categorical_summary"],
         index=False,
     )
 
-    quality_reports["unexpected_codes"].to_csv(
-        unexpected_codes_path,
-        index=False,
-    )
+    for report_name in [
+        "unexpected_codes",
+        "sentinel_counts",
+        "missingness",
+        "numeric_range_warnings",
+        "definition_warnings",
+        "ratio_warnings",
+    ]:
+        quality_reports[report_name].to_csv(
+            output_paths[report_name],
+            index=False,
+        )
 
-    quality_reports["sentinel_counts"].to_csv(
-        sentinel_counts_path,
-        index=False,
-    )
-
-    quality_reports["missingness"].to_csv(
-        missingness_path,
-        index=False,
-    )
-
-    quality_reports["high_ratio_warnings"].to_csv(
-        high_ratio_warnings_path,
-        index=False,
-    )
-
-    with validation_path.open(
+    with output_paths["validation"].open(
         mode="w",
         encoding="utf-8",
     ) as validation_file:
@@ -139,8 +135,18 @@ def run_origination_pipeline(
                 "unexpected_code_rows": len(
                     quality_reports["unexpected_codes"]
                 ),
-                "high_ratio_warning_rows": len(
-                    quality_reports["high_ratio_warnings"]
+                "numeric_range_warning_rows": len(
+                    quality_reports[
+                        "numeric_range_warnings"
+                    ]
+                ),
+                "definition_warning_rows": len(
+                    quality_reports[
+                        "definition_warnings"
+                    ]
+                ),
+                "ratio_warning_rows": len(
+                    quality_reports["ratio_warnings"]
                 ),
             },
             validation_file,
@@ -155,24 +161,6 @@ def run_origination_pipeline(
         "validation": validation_report,
         "numeric_summary": summaries["numeric"],
         "categorical_summary": summaries["categorical"],
-        "unexpected_codes": (
-            quality_reports["unexpected_codes"]
-        ),
-        "sentinel_counts": (
-            quality_reports["sentinel_counts"]
-        ),
-        "missingness": quality_reports["missingness"],
-        "high_ratio_warnings": (
-            quality_reports["high_ratio_warnings"]
-        ),
-        "output_paths": {
-            "cleaned": cleaned_path,
-            "numeric_summary": numeric_summary_path,
-            "categorical_summary": categorical_summary_path,
-            "unexpected_codes": unexpected_codes_path,
-            "sentinel_counts": sentinel_counts_path,
-            "missingness": missingness_path,
-            "high_ratio_warnings": high_ratio_warnings_path,
-            "validation": validation_path,
-        },
+        **quality_reports,
+        "output_paths": output_paths,
     }
