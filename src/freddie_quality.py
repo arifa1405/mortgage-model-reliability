@@ -3,11 +3,19 @@
 import pandas as pd
 
 from .freddie_config import (
+    ACE_PDR_AVAILABLE_YEAR,
+    BORROWER_COUNT_CHANGE_QUARTER,
+    BORROWER_COUNT_CHANGE_YEAR,
     DOCUMENTED_CODE_VALUES,
+    DOCUMENTED_NUMERIC_RANGES,
     DOCUMENTED_SENTINELS,
     EXPANDED_RATIO_MAXIMUM,
+    EXPANDED_RATIO_MINIMUM,
     PRIOR_CLTV_MAXIMUM,
+    PRIOR_CLTV_MINIMUM,
     PRIOR_LTV_MAXIMUM,
+    PRIOR_LTV_MINIMUM,
+    PROPERTY_VALUATION_AVAILABLE_YEAR,
     RATIO_DISCLOSURE_CHANGE_QUARTER,
     RATIO_DISCLOSURE_CHANGE_YEAR,
     RATIO_SENTINEL,
@@ -26,9 +34,7 @@ def _normalize_code(
         isinstance(value, float)
         and value.is_integer()
     ):
-        return str(
-            int(value)
-        )
+        return str(int(value))
 
     return str(value).strip()
 
@@ -55,11 +61,41 @@ def _extract_origination_quarter(
     ).astype("Int64")
 
 
-def _create_high_ratio_warnings(
+def _effective_date_mask(
+    data: pd.DataFrame,
+    year: int,
+    change_year: int,
+    change_quarter: int,
+) -> pd.Series:
+    """Return rows governed by a year-and-quarter disclosure change."""
+
+    if year > change_year:
+        return pd.Series(
+            True,
+            index=data.index,
+            dtype="boolean",
+        )
+
+    if year < change_year:
+        return pd.Series(
+            False,
+            index=data.index,
+            dtype="boolean",
+        )
+
+    return (
+        _extract_origination_quarter(data)
+        .ge(change_quarter)
+        .fillna(False)
+        .astype("boolean")
+    )
+
+
+def _create_ratio_warnings(
     data: pd.DataFrame,
     year: int,
 ) -> pd.DataFrame:
-    """Flag ratio values inconsistent with applicable disclosure rules."""
+    """Flag LTV and CLTV values inconsistent with disclosure rules."""
 
     required_columns = {
         "LOAN IDENTIFIER",
@@ -69,21 +105,16 @@ def _create_high_ratio_warnings(
         "PRE-HARP LOAN SEQUENCE NUMBER",
     }
 
-    missing_columns = (
-        required_columns
-        - set(data.columns)
-    )
+    missing_columns = required_columns - set(data.columns)
 
     if missing_columns:
         raise KeyError(
-            "Required high-ratio quality columns are missing: "
+            "Required ratio-quality columns are missing: "
             f"{sorted(missing_columns)}"
         )
 
     ltv = pd.to_numeric(
-        data[
-            "ORIGINAL LOAN-TO-VALUE (LTV)"
-        ],
+        data["ORIGINAL LOAN-TO-VALUE (LTV)"],
         errors="coerce",
     )
 
@@ -102,35 +133,18 @@ def _create_high_ratio_warnings(
         cltv.eq(RATIO_SENTINEL)
     )
 
-    origination_quarter = (
-        _extract_origination_quarter(data)
+    origination_quarter = _extract_origination_quarter(
+        data
     )
 
-    if year > RATIO_DISCLOSURE_CHANGE_YEAR:
-        expanded_ratio_rules = pd.Series(
-            True,
-            index=data.index,
-            dtype="boolean",
-        )
+    expanded_ratio_rules = _effective_date_mask(
+        data=data,
+        year=year,
+        change_year=RATIO_DISCLOSURE_CHANGE_YEAR,
+        change_quarter=RATIO_DISCLOSURE_CHANGE_QUARTER,
+    )
 
-    elif year < RATIO_DISCLOSURE_CHANGE_YEAR:
-        expanded_ratio_rules = pd.Series(
-            False,
-            index=data.index,
-            dtype="boolean",
-        )
-
-    else:
-        expanded_ratio_rules = (
-            origination_quarter
-            .ge(
-                RATIO_DISCLOSURE_CHANGE_QUARTER
-            )
-            .fillna(False)
-            .astype("boolean")
-        )
-
-    harp_supported = (
+    harp_indicator = (
         data["HARP INDICATOR"]
         .astype("string")
         .str.strip()
@@ -139,72 +153,96 @@ def _create_high_ratio_warnings(
     )
 
     pre_harp_sequence = (
-        data[
-            "PRE-HARP LOAN SEQUENCE NUMBER"
-        ]
+        data["PRE-HARP LOAN SEQUENCE NUMBER"]
         .astype("string")
         .str.strip()
     )
 
-    pre_harp_supported = (
+    pre_harp_present = (
         pre_harp_sequence.notna()
         & pre_harp_sequence.ne("")
     )
 
-    complete_harp_support = (
-        harp_supported
-        & pre_harp_supported
+    # Before 2018 Q2, expanded ratio ranges apply to documented
+    # HARP loans. Requiring both fields makes this a consistency rule.
+    expanded_or_harp = (
+        expanded_ratio_rules
+        | (
+            harp_indicator
+            & pre_harp_present
+        )
     )
 
-    # Before 2018 Q2, LTV above 105% requires complete
-    # HARP support.
-    unsupported_prior_ltv = (
-        ~expanded_ratio_rules
-        & valid_ltv.gt(
-            PRIOR_LTV_MAXIMUM
-        )
-        & valid_ltv.le(
-            EXPANDED_RATIO_MAXIMUM
-        )
-        & ~complete_harp_support
+    ltv_minimum = pd.Series(
+        PRIOR_LTV_MINIMUM,
+        index=data.index,
+        dtype="float64",
+    ).mask(
+        expanded_or_harp,
+        EXPANDED_RATIO_MINIMUM,
     )
 
-    # Before 2018 Q2, CLTV above 200% requires complete
-    # HARP support.
-    unsupported_prior_cltv = (
-        ~expanded_ratio_rules
-        & valid_cltv.gt(
-            PRIOR_CLTV_MAXIMUM
-        )
-        & valid_cltv.le(
-            EXPANDED_RATIO_MAXIMUM
-        )
-        & ~complete_harp_support
+    ltv_maximum = pd.Series(
+        PRIOR_LTV_MAXIMUM,
+        index=data.index,
+        dtype="float64",
+    ).mask(
+        expanded_or_harp,
+        EXPANDED_RATIO_MAXIMUM,
     )
 
-    # Values above 998% are outside the documented range
-    # under both disclosure definitions.
-    invalid_ltv_maximum = valid_ltv.gt(
-        EXPANDED_RATIO_MAXIMUM
+    cltv_minimum = pd.Series(
+        PRIOR_CLTV_MINIMUM,
+        index=data.index,
+        dtype="float64",
+    ).mask(
+        expanded_or_harp,
+        EXPANDED_RATIO_MINIMUM,
     )
 
-    invalid_cltv_maximum = valid_cltv.gt(
-        EXPANDED_RATIO_MAXIMUM
+    cltv_maximum = pd.Series(
+        PRIOR_CLTV_MAXIMUM,
+        index=data.index,
+        dtype="float64",
+    ).mask(
+        expanded_or_harp,
+        EXPANDED_RATIO_MAXIMUM,
+    )
+
+    low_ltv_warning = (
+        valid_ltv.notna()
+        & valid_ltv.lt(ltv_minimum)
     )
 
     high_ltv_warning = (
-        unsupported_prior_ltv
-        | invalid_ltv_maximum
+        valid_ltv.notna()
+        & valid_ltv.gt(ltv_maximum)
+    )
+
+    low_cltv_warning = (
+        valid_cltv.notna()
+        & valid_cltv.lt(cltv_minimum)
     )
 
     high_cltv_warning = (
-        unsupported_prior_cltv
-        | invalid_cltv_maximum
+        valid_cltv.notna()
+        & valid_cltv.gt(cltv_maximum)
+    )
+
+    # Freddie Mac instructs that CLTV should be reported as 999 when
+    # the calculated CLTV is lower than LTV.
+    cltv_below_ltv_warning = (
+        valid_ltv.notna()
+        & valid_cltv.notna()
+        & valid_cltv.lt(valid_ltv)
     )
 
     warning_mask = (
-        high_ltv_warning
+        low_ltv_warning
+        | high_ltv_warning
+        | low_cltv_warning
         | high_cltv_warning
+        | cltv_below_ltv_warning
     )
 
     warnings = data.loc[
@@ -227,25 +265,227 @@ def _create_high_ratio_warnings(
     warnings.insert(
         1,
         "origination_quarter",
-        origination_quarter.loc[
-            warning_mask
-        ],
+        origination_quarter.loc[warning_mask],
+    )
+
+    warnings["LOW LTV FLAG"] = (
+        low_ltv_warning.loc[warning_mask]
     )
 
     warnings["HIGH LTV FLAG"] = (
-        high_ltv_warning.loc[
-            warning_mask
-        ]
+        high_ltv_warning.loc[warning_mask]
+    )
+
+    warnings["LOW CLTV FLAG"] = (
+        low_cltv_warning.loc[warning_mask]
     )
 
     warnings["HIGH CLTV FLAG"] = (
-        high_cltv_warning.loc[
-            warning_mask
-        ]
+        high_cltv_warning.loc[warning_mask]
     )
 
-    return warnings.reset_index(
-        drop=True
+    warnings["CLTV BELOW LTV FLAG"] = (
+        cltv_below_ltv_warning.loc[warning_mask]
+    )
+
+    return warnings.reset_index(drop=True)
+
+
+def _create_numeric_range_warnings(
+    data: pd.DataFrame,
+    year: int,
+) -> pd.DataFrame:
+    """Summarize non-sentinel values outside documented numeric ranges."""
+
+    warning_rows = []
+
+    for column, (
+        minimum,
+        maximum,
+    ) in DOCUMENTED_NUMERIC_RANGES.items():
+        if column not in data.columns:
+            continue
+
+        raw_values = data[column]
+        normalized_values = raw_values.map(
+            _normalize_code
+        )
+        numeric_values = pd.to_numeric(
+            raw_values,
+            errors="coerce",
+        )
+
+        sentinel = DOCUMENTED_SENTINELS.get(
+            column
+        )
+        normalized_sentinel = _normalize_code(
+            sentinel
+        )
+
+        eligible = (
+            normalized_values.notna()
+            & normalized_values.ne(
+                normalized_sentinel
+            )
+        )
+
+        invalid = (
+            eligible
+            & (
+                numeric_values.isna()
+                | numeric_values.lt(minimum)
+                | numeric_values.gt(maximum)
+            )
+        )
+
+        invalid_counts = (
+            normalized_values.loc[invalid]
+            .value_counts(dropna=False)
+        )
+
+        for value, count in invalid_counts.items():
+            warning_rows.append(
+                {
+                    "year": year,
+                    "column": column,
+                    "unexpected_value": value,
+                    "count": int(count),
+                    "rule": (
+                        f"non-sentinel value must be between "
+                        f"{minimum} and {maximum}"
+                    ),
+                }
+            )
+
+    return pd.DataFrame(
+        warning_rows,
+        columns=[
+            "year",
+            "column",
+            "unexpected_value",
+            "count",
+            "rule",
+        ],
+    )
+
+
+def _create_definition_warnings(
+    data: pd.DataFrame,
+    year: int,
+) -> pd.DataFrame:
+    """Check codes whose documented meaning changes over time."""
+
+    warning_rows = []
+
+    borrower_column = "NUMBER OF BORROWERS"
+
+    if borrower_column in data.columns:
+        borrower_count = pd.to_numeric(
+            data[borrower_column],
+            errors="coerce",
+        ).mask(
+            lambda values: values.eq(
+                DOCUMENTED_SENTINELS[
+                    borrower_column
+                ]
+            )
+        )
+
+        exact_count_rules = _effective_date_mask(
+            data=data,
+            year=year,
+            change_year=BORROWER_COUNT_CHANGE_YEAR,
+            change_quarter=BORROWER_COUNT_CHANGE_QUARTER,
+        )
+
+        invalid_borrower_definition = (
+            ~exact_count_rules
+            & borrower_count.gt(2)
+            & borrower_count.le(10)
+        )
+
+        invalid_counts = (
+            data.loc[
+                invalid_borrower_definition,
+                borrower_column,
+            ]
+            .map(_normalize_code)
+            .value_counts()
+        )
+
+        for value, count in invalid_counts.items():
+            warning_rows.append(
+                {
+                    "year": year,
+                    "column": borrower_column,
+                    "unexpected_value": value,
+                    "count": int(count),
+                    "rule": (
+                        "2018 Q1 and earlier permit 1, 2, "
+                        "or unavailable code 99"
+                    ),
+                }
+            )
+
+    valuation_column = "PROPERTY VALUATION METHOD"
+
+    if valuation_column in data.columns:
+        valuation_method = (
+            data[valuation_column]
+            .map(_normalize_code)
+        )
+
+        if year < PROPERTY_VALUATION_AVAILABLE_YEAR:
+            invalid_valuation_definition = (
+                valuation_method.notna()
+                & valuation_method.ne("7")
+            )
+            valuation_rule = (
+                "usable Property Valuation Method codes "
+                "begin with 2017 originations"
+            )
+        elif year < ACE_PDR_AVAILABLE_YEAR:
+            invalid_valuation_definition = (
+                valuation_method.eq("4")
+            )
+            valuation_rule = (
+                "Property Valuation Method code 4 "
+                "begins in 2022"
+            )
+        else:
+            invalid_valuation_definition = pd.Series(
+                False,
+                index=data.index,
+            )
+            valuation_rule = ""
+
+        invalid_counts = (
+            valuation_method.loc[
+                invalid_valuation_definition
+            ]
+            .value_counts()
+        )
+
+        for value, count in invalid_counts.items():
+            warning_rows.append(
+                {
+                    "year": year,
+                    "column": valuation_column,
+                    "unexpected_value": value,
+                    "count": int(count),
+                    "rule": valuation_rule,
+                }
+            )
+
+    return pd.DataFrame(
+        warning_rows,
+        columns=[
+            "year",
+            "column",
+            "unexpected_value",
+            "count",
+            "rule",
+        ],
     )
 
 
@@ -253,7 +493,7 @@ def create_origination_quality_report(
     data: pd.DataFrame,
     year: int,
 ) -> dict[str, pd.DataFrame]:
-    """Create code, sentinel, missingness, and ratio reports."""
+    """Create code, sentinel, missingness, range, and ratio reports."""
 
     unexpected_code_rows = []
     sentinel_rows = []
@@ -266,9 +506,7 @@ def create_origination_quality_report(
                 {
                     "year": year,
                     "column": column,
-                    "unexpected_value": (
-                        "<MISSING COLUMN>"
-                    ),
+                    "unexpected_value": "<MISSING COLUMN>",
                     "count": 0,
                 }
             )
@@ -278,10 +516,8 @@ def create_origination_quality_report(
             _normalize_code
         )
 
-        value_counts = (
-            normalized_values.value_counts(
-                dropna=True
-            )
+        value_counts = normalized_values.value_counts(
+            dropna=True
         )
 
         for value, count in value_counts.items():
@@ -315,8 +551,8 @@ def create_origination_quality_report(
             _normalize_code
         )
 
-        normalized_sentinel = (
-            _normalize_code(sentinel)
+        normalized_sentinel = _normalize_code(
+            sentinel
         )
 
         sentinel_count = int(
@@ -329,9 +565,7 @@ def create_origination_quality_report(
             {
                 "year": year,
                 "column": column,
-                "sentinel": (
-                    normalized_sentinel
-                ),
+                "sentinel": normalized_sentinel,
                 "count": sentinel_count,
                 "percentage": (
                     sentinel_count
@@ -380,18 +614,30 @@ def create_origination_quality_report(
         missingness_rows
     )
 
-    high_ratio_warnings = (
-        _create_high_ratio_warnings(
+    numeric_range_warnings = (
+        _create_numeric_range_warnings(
             data=data,
             year=year,
         )
+    )
+
+    definition_warnings = (
+        _create_definition_warnings(
+            data=data,
+            year=year,
+        )
+    )
+
+    ratio_warnings = _create_ratio_warnings(
+        data=data,
+        year=year,
     )
 
     return {
         "unexpected_codes": unexpected_codes,
         "sentinel_counts": sentinel_counts,
         "missingness": missingness,
-        "high_ratio_warnings": (
-            high_ratio_warnings
-        ),
+        "numeric_range_warnings": numeric_range_warnings,
+        "definition_warnings": definition_warnings,
+        "ratio_warnings": ratio_warnings,
     }
