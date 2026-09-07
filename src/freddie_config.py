@@ -136,6 +136,25 @@ EXPANDED_RATIO_MAXIMUM = 998
 RATIO_SENTINEL = 999
 
 
+# Other disclosure-effective dates used by time-aware quality rules.
+BORROWER_COUNT_CHANGE_YEAR = 2018
+BORROWER_COUNT_CHANGE_QUARTER = 2
+PROPERTY_VALUATION_AVAILABLE_YEAR = 2017
+ACE_PDR_AVAILABLE_YEAR = 2022
+
+
+# Numeric ranges from the Freddie Mac General User Guide. Documented
+# unavailable codes are excluded before these ranges are evaluated.
+DOCUMENTED_NUMERIC_RANGES = {
+    "CLASSIC FICO": (300, 850),
+    "MORTGAGE INSURANCE PERCENTAGE (MI %)": (0, 55),
+    "NUMBER OF UNITS": (1, 4),
+    "ORIGINAL DEBT-TO-INCOME (DTI) RATIO": (1, 65),
+    "NUMBER OF BORROWERS": (1, 10),
+    "VANTAGESCORE 4.0": (300, 850),
+}
+
+
 # Documented code sets from the Freddie Mac General User Guide.
 # Missing/null values are handled separately and are not included here.
 DOCUMENTED_CODE_VALUES = {
