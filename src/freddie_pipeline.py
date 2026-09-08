@@ -49,10 +49,12 @@ def run_origination_pipeline(
         expected_rows=expected_rows,
     )
 
-    cohort_validation_report = validate_origination_cohorts(
-    origination=cleaned,
-    expected_year=year,
-)
+    cohort_validation_report = (
+        validate_origination_cohorts(
+            origination=cleaned,
+            expected_year=year,
+        )
+    )
 
     quality_reports = create_origination_quality_report(
         data=raw,
