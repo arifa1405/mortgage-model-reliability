@@ -3,3 +3,4 @@ pyarrow
 jupyter
 ipykernel
 matplotlib
+openpyxl
