@@ -4,6 +4,11 @@ import json
 from pathlib import Path
 
 from .freddie_cleaning import clean_origination
+from .freddie_cohorts import (
+    add_origination_cohorts,
+    create_origination_cohort_summary,
+    validate_origination_cohorts,
+)
 from .freddie_ingestion import load_origination
 from .freddie_quality import create_origination_quality_report
 from .freddie_summary import create_annual_summary
@@ -16,7 +21,10 @@ def run_origination_pipeline(
     output_directory: str | Path,
     expected_rows: int | None = None,
 ) -> dict[str, object]:
-    """Load, clean, validate, summarize, and save one annual sample."""
+    """
+    Load, clean, create cohorts, validate, summarize, and save
+    one annual sample.
+    """
 
     input_file = Path(input_file)
     output_directory = Path(output_directory)
@@ -30,11 +38,21 @@ def run_origination_pipeline(
 
     cleaned = clean_origination(raw)
 
+    cleaned = add_origination_cohorts(
+        origination=cleaned,
+        expected_year=year,
+    )
+
     validation_report = validate_origination(
         raw=raw,
         cleaned=cleaned,
         expected_rows=expected_rows,
     )
+
+    cohort_validation_report = validate_origination_cohorts(
+    origination=cleaned,
+    expected_year=year,
+)
 
     quality_reports = create_origination_quality_report(
         data=raw,
@@ -44,6 +62,10 @@ def run_origination_pipeline(
     summaries = create_annual_summary(
         data=cleaned,
         year=year,
+    )
+
+    cohort_summary = create_origination_cohort_summary(
+        origination=cleaned,
     )
 
     output_directory.mkdir(
@@ -63,6 +85,10 @@ def run_origination_pipeline(
         "categorical_summary": (
             output_directory
             / f"origination_{year}_categorical_summary.csv"
+        ),
+        "cohort_summary": (
+            output_directory
+            / f"origination_{year}_cohort_summary.csv"
         ),
         "unexpected_codes": (
             output_directory
@@ -110,6 +136,11 @@ def run_origination_pipeline(
         index=False,
     )
 
+    cohort_summary.to_csv(
+        output_paths["cohort_summary"],
+        index=False,
+    )
+
     for report_name in [
         "unexpected_codes",
         "sentinel_counts",
@@ -132,6 +163,13 @@ def run_origination_pipeline(
                 "year": year,
                 "structure_validation": structure_report,
                 "data_validation": validation_report,
+                "cohort_validation": cohort_validation_report,
+                "cohort_summary_rows": len(
+                    cohort_summary
+                ),
+                "cohort_summary_records": int(
+                    cohort_summary["count"].sum()
+                ),
                 "unexpected_code_rows": len(
                     quality_reports["unexpected_codes"]
                 ),
@@ -159,8 +197,10 @@ def run_origination_pipeline(
         "cleaned": cleaned,
         "structure_validation": structure_report,
         "validation": validation_report,
+        "cohort_validation": cohort_validation_report,
         "numeric_summary": summaries["numeric"],
         "categorical_summary": summaries["categorical"],
+        "cohort_summary": cohort_summary,
         **quality_reports,
         "output_paths": output_paths,
     }
