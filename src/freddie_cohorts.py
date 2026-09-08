@@ -1,3 +1,5 @@
+"""Origination cohort utilities for Freddie Mac loan data."""
+
 import re
 
 import pandas as pd
@@ -128,6 +130,7 @@ def add_origination_cohorts(
 
     return cohort_data
 
+
 def create_origination_cohort_summary(
     origination: pd.DataFrame,
 ) -> pd.DataFrame:
@@ -189,6 +192,7 @@ def create_origination_cohort_summary(
         .reset_index(drop=True)
     )
 
+
 def validate_origination_cohorts(
     origination: pd.DataFrame,
     expected_year: int,
@@ -234,9 +238,12 @@ def validate_origination_cohorts(
     ]
 
     invalid_year_values = int(
-        actual_year
-        .ne(expected_year_values)
-        .sum()
+        (
+            actual_year.isna()
+            | actual_year.ne(
+                expected_year_values
+            ).fillna(True)
+        ).sum()
     )
 
     actual_quarter = origination[
