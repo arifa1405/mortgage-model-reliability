@@ -671,22 +671,42 @@ def summarize_horizon_targets(
         ]
         total_loans = len(horizon_data)
         eligible_loans = len(eligible)
+        left_truncated_loans = int(
+            horizon_data["LEFT_TRUNCATED"].sum()
+        )
+        observable_cohort_loans = (
+            total_loans - left_truncated_loans
+        )
+        incomplete_follow_up_loans = int(
+            (
+                ~horizon_data["LEFT_TRUNCATED"]
+                & ~horizon_data["FOLLOW_UP_COMPLETE"]
+            ).sum()
+        )
 
         summary_rows.append(
             {
                 "horizon_months": int(horizon),
                 "total_loans": total_loans,
                 "eligible_loans": eligible_loans,
-                "coverage_percentage": (
+                "sample_retention_percentage": (
                     eligible_loans / total_loans * 100
                     if total_loans
                     else 0.0
                 ),
-                "left_truncated_loans": int(
-                    horizon_data["LEFT_TRUNCATED"].sum()
+                "left_truncated_loans": left_truncated_loans,
+                "observable_cohort_loans": (
+                    observable_cohort_loans
                 ),
-                "incomplete_follow_up_loans": int(
-                    (~horizon_data["FOLLOW_UP_COMPLETE"]).sum()
+                "incomplete_follow_up_loans": (
+                    incomplete_follow_up_loans
+                ),
+                "observable_cohort_coverage_percentage": (
+                    eligible_loans
+                    / observable_cohort_loans
+                    * 100
+                    if observable_cohort_loans
+                    else 0.0
                 ),
                 "serious_delinquency_events": int(
                     eligible["TARGET_90_PLUS"].sum()
