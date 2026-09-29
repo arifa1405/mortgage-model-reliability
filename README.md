@@ -43,8 +43,8 @@ when retraining is genuinely beneficial?
 The analysis follows two models through development, out-of-time monitoring,
 degradation assessment, and retraining evaluation:
 
-- Logistic Regression as a transparent, interpretable benchmark.
-- XGBoost for nonlinear relationships and feature interactions.
+- XGBoost as the primary model for nonlinear relationships and feature interactions.
+- Logistic Regression as a transparent comparison benchmark using the same temporal split and features.
 
 The objective is model reliability under temporal population change—not a broad
 model-accuracy tournament.
@@ -56,8 +56,8 @@ model-accuracy tournament.
 Freddie Mac Single-Family Loan-Level Dataset annual samples are used for model
 development and temporal monitoring.
 
-- 2015–2019: baseline development and temporal-validation window.
-- 2020 onward: out-of-time drift and degradation monitoring.
+- 2015–2017: development cohorts for model training and fitted preprocessing.
+- 2018–2023: sequential out-of-time cohorts for evaluation and reliability monitoring.
 - Each annual sample contains approximately 50,000 loans.
 - Annual files remain intact; origination quarter will be retained as metadata
   for later cohort-level analysis.
@@ -99,9 +99,9 @@ The notebook decisions were converted into reusable Python modules for:
 - Annual Parquet, CSV, and JSON outputs.
 - Saved-output and serialization verification.
 
-### 2015–2019 origination harmonization
+### Origination harmonization
 
-The reusable pipeline was successfully applied to five annual samples:
+The reusable pipeline was first verified on the 2015–2019 samples:
 
 - 250,000 sampled loans processed.
 - 50,000 loans per year.
@@ -113,42 +113,54 @@ The reusable pipeline was successfully applied to five annual samples:
 - Saved warning-report counts agree with validation JSON files.
 - All five saved Parquet datasets pass read-back validation.
 
-The analysis also records disclosure and definition changes so they are not
+The pipeline was then extended through 2023 (nine annual samples, 450,000 origination
+rows). The analysis records disclosure and definition changes so they are not
 mistaken for ordinary borrower-population drift.
+
+### Performance targets and modeling dataset (2015–2023)
+
+- Notebook 04 developed the 24-month outcome definition on the 2015 sample.
+  The composite label records 90+ serious delinquency or a defined terminal
+  credit event; the 90+ only label is retained for sensitivity analysis.
+- Notebook 05 applied the fixed target contract to all nine annual cohorts,
+  with annual, quarterly, coverage, event-component, and read-back checks.
+- Notebook 06 joined eligible targets to cleaned origination records by source
+  year and loan identifier. The validated modeling dataset has 437,668 rows
+  and 59 columns, with no duplicate loan/year keys or missing labels.
+
+### Feature engineering (2015–2023)
+
+- Notebook 07 and `src/freddie_features.py` define 29 origination-time
+  predictors (15 numeric, 14 categorical) and document decisions for all
+  31 raw origination fields.
+- Fitted imputation and category rules use 2015–2017 only. The frozen contract
+  applies to 2018–2023; identifiers, cohort metadata, and post-origination
+  target-audit fields do not enter the predictor matrix.
+- The feature output has 437,668 rows and passed save/read-back validation.
+  Tests cover merge integrity, leakage exclusion, unseen categories, and
+  development-only preprocessing.
 
 ## Current Repository Structure
 
-```text
-notebooks/
-├── 01_freddie_mac_data_understanding.ipynb
-├── 02_ingest_2015_sample.ipynb
-└── 03_freddie_multi_year_origination_validation.ipynb
-
-src/
-├── freddie_config.py
-├── freddie_ingestion.py
-├── freddie_cleaning.py
-├── freddie_validation.py
-├── freddie_quality.py
-├── freddie_summary.py
-└── freddie_pipeline.py
-```
+- `notebooks/01`–`07`: exploration, origination validation, target development,
+  multi-year performance validation, modeling-data join, and feature engineering.
+- `src/`: reusable origination, cohort, performance, modeling-dataset, and
+  feature-engineering modules.
+- `tests/`: modeling-dataset and feature-engineering unit tests.
+- `data/raw/`, `data/interim/`, `data/processed/`: local data directories; raw
+  and generated files are excluded from Git.
 
 ## Next Implementation Stages
 
-- Derive and retain origination year, quarter, cohort, and documentation-rule
-  period.
-- Build reusable performance-file ingestion and validation.
-- Research, define, and audit a consistent 24-month 90+ delinquency target.
-- Create one leakage-safe modeling row per eligible loan.
-- Train and temporally validate Logistic Regression and XGBoost.
-- Freeze the 2015–2019 baseline models.
-- Measure 2020+ population, prediction, and model-aware drift.
-- Confirm later discrimination and calibration degradation after labels mature.
-- Back-test early-warning signals without using future information.
-- Compare frozen, calendar, conventional-drift, and evidence-based retraining
-  policies on untouched future cohorts.
-- Perform locked-method external validation with harmonized Fannie Mae data.
+- Complete the peer-reviewed literature review and lock the drift/degradation
+  and early-warning evaluation design.
+- Train XGBoost (primary) and Logistic Regression (comparison) on 2015–2017,
+  then evaluate frozen models sequentially on 2018–2023.
+- Measure population and prediction drift and later discrimination and
+  calibration changes as 24-month labels become available.
+- Back-test label-free early-warning signals and compare retraining policies
+  using only information available at each decision point.
+- Perform secondary external validation with harmonized Fannie Mae data.
 
 ## Planned Evaluation
 
@@ -196,9 +208,9 @@ The current Freddie Mac origination pipeline is based primarily on:
 
 ## Current Status
 
-**Completed:** 2015 baseline origination EDA, reusable origination processing,
-and documentation-aware validation and harmonization of the 2015–2019 annual
-origination samples.
+**Completed:** Freddie Mac origination and performance validation through
+2015–2023, the eligible 24-month target, the 437,668-row modeling dataset,
+and leakage-safe feature engineering with preprocessing fit on 2015–2017.
 
-**Next:** cohort metadata integration, followed by reusable Freddie Mac
-performance-data ingestion and validation.
+**Next:** literature-grounded modeling methodology, then train the two models
+and evaluate reliability across 2018–2023.
