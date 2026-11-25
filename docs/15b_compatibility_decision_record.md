@@ -3,7 +3,7 @@
 **Project:** Mortgage Credit-Risk Model Reliability Under Changing Borrower Populations  
 **Prepared:** 25 November 2026  
 **Evidence baseline:** feature branch `feature/freddie-retraining-feasibility`, commit `b55b78296bb16456b3d2bec1c274d27eb20d9d89`  
-**Status:** EDA and its computational follow-up are reviewed. The proposed companion specification is ready for methodological review. Exact Fannie release provenance remains unverified. This record does not approve model scoring or start Notebook 16.
+**Status:** EDA and its computational follow-up are reviewed. The researcher has authorized Notebook 16 companion development using Freddie only. Exact Fannie publication release and original download date were not retained; this is a provenance limitation, not a failed structural check or an automatic training/evaluation block. External scoring has not been approved or performed.
 
 ## 1. Decision summary
 
@@ -21,8 +21,8 @@ The external study is a retrospective comparison of related mortgage populations
 | Fannie raw CLTV | All 260,395 earliest snapshots matched; one missing/invalid CLTV; no observed CLTV below LTV. | Raw-CLTV EDA complete; retain the existing missingness treatment. |
 | Fannie 56 conflicting histories | Distinct nonblank values change in selected fields; the earliest snapshot remains the implemented source. | Retain existing values and flags; disclose unresolved reasons. No silent replacement, future backfill or exclusion. |
 | Primary and strict eligibility | The additional strict exclusions are 200 repurchases and one reporting gap, with no overlap between these two groups. | Keep both existing populations. Strict Fannie eligibility is a sensitivity, not a claim of matched strict Freddie eligibility. |
-| Release provenance | Raw-file identity is fixed by hash and size, but no download/release record or matching local glossary was supplied. | Open evidence item. Do not infer release vintage from acquisition quarter, last reporting month or field count. |
-| Credit-score equivalence | The existing proxy is the minimum available disclosed borrower/co-borrower score. Official disclosures changed during 2026. | Exclude FICO and its missingness flag from the primary specification; retain the 24-feature sensitivity as conditional on release review. Do not substitute a different field silently. |
+| Release provenance | Raw-file identity is fixed by hash and size; the original download history is unavailable. Official provider definitions and earlier positional audits are available. | Record the original publication release as unverified. Missing download date alone is not a training or external-evaluation gate. Evaluate actual retained-field definitions separately; do not infer release vintage from acquisition quarter, last reporting month or field count. |
+| Credit-score equivalence | The existing proxy is the minimum available disclosed borrower/co-borrower score. Official disclosures changed during 2026. | Exclude FICO and its missingness flag from the primary specification. Freddie-only training of the 24-feature sensitivity is authorized; its Fannie interpretation remains conditional on score-mapping review. Do not substitute a different field silently. |
 | Composite target semantics | Both implementations use numeric serious delinquency and selected terminal codes, but some event definitions differ across agencies. | Propose a mapped 24-month composite outcome with explicit differences; obtain approval of this interpretation before external scoring. Do not claim literal outcome equivalence. |
 | Earliest-snapshot timing | The audit confirms which row was selected; it does not establish historical publication availability or prove that every field was known at origination. | Accept only as a disclosed retrospective measurement limitation, subject to milestone approval. No prospective deployment claim. |
 | Population coverage | Fannie is an acquisition-file subset; Freddie is an annual sample. Fannie primary coverage excludes HARP whereas the Freddie research includes HARP. | Retain the existing study populations for the proposed pilot and disclose the coverage difference. Do not introduce a new matched-product filter without a separately reviewed specification. |
@@ -59,6 +59,10 @@ The corrected dollar-balance PSI values use the same reference bins and 0.5 coun
 | Fannie candidate Parquet identified by the reviewed run | `29aebd65b716fb1d21434cb1d3ab109da7640086a3a5b0ab5a39407c7c52c70f` |
 
 The raw source has 6,928,164,686 bytes, 23,563,399 monthly records and 458,830 distinct loans in the acquisition file. These identify the reviewed input; they do not identify its publication release.
+
+### Earlier structural inspection
+
+The researcher subsequently supplied `10_fannie_2018q1_compatibility_inspection.ipynb`, an earlier local notebook absent from the searched GitHub branches. It performed seven positional spot checks and referenced the September 10, 2026 glossary. Its parser removed the leading blank field, shifting the mapping, and its streaming audit stopped at physical line 30. The failed loan-order check cannot independently establish noncontiguous loan histories because the loan-ID mapping was shifted. Treat this notebook as preliminary inspection, not successful full validation. Notebook 14 corrected positional alignment; 14B and subsequent audits provide the corrected full-file evidence. No repeat structural scan is required because the original download history is unavailable.
 
 ## 3. Correct interpretation of the Freddie ratios
 
@@ -118,7 +122,7 @@ The primary contract contains 13 numeric/binary predictors and nine categorical 
 
 ### FICO sensitivity: 24 predictors
 
-Append `FICO_SCORE` and `FICO_SCORE_MISSING`, in that order. The Fannie score remains the already constructed minimum-available disclosed-score proxy, conditional on release review. Do not backfill it from later reporting rows or replace it with field 111, a current score, or a newer score model without a documented new mapping and approval.
+Append `FICO_SCORE` and `FICO_SCORE_MISSING`, in that order. The Fannie score remains the already constructed minimum-available disclosed-score proxy, conditional on score-mapping review for external interpretation. Training the corresponding Freddie companion does not certify that proxy. Do not backfill it from later reporting rows or replace it with field 111, a current score, or a newer score model without a documented new mapping and approval.
 
 The original `FIRST_TIME_HOMEBUYER`, fine-grained `LOAN_PURPOSE`, `SUPER_CONFORMING_FLAG`, `SPECIAL_ELIGIBILITY_PROGRAM`, `HARP_INDICATOR` and `INTEREST_ONLY_INDICATOR` are not primary companion inputs. Their omission does not mean their underlying populations or definitions have become equivalent.
 
@@ -152,7 +156,7 @@ Changes between blank and populated borrower scores among flagged histories are 
 
 The proposed acceptance is limited to a retrospective study of disclosed records. Do not infer verified real-time feature availability, deployment readiness or independent prospective warning validity. Any conflict-exclusion sensitivity would need an explicit outcome-independent rule and separate approval; it is not added to the primary analysis by this record.
 
-## 7. Release evidence: the remaining factual gap
+## 7. Release identification: a documented provenance limitation
 
 The 2024 glossary alone is insufficient to certify a 113-field local file. Fannie announced additional score fields and a transition in 2026 [S4]. The currently retrieved glossary is dated 9 November 2026 and documents the legacy origination score fields and newer score fields [S3]. A further announced SF dataset change is scheduled for January 2027; its CRT timing is different [S5]. These schedules must not be conflated.
 
@@ -160,24 +164,26 @@ The 2024 glossary alone is insufficient to certify a 113-field local file. Fanni
 
 The primary 22-feature proposal limits dependence on uncertain score equivalence. It does not, by itself, close provenance for the other retained fields and target codes.
 
-To close this item, retain a record tying the actual local download to its provider publication and applicable layout. Useful evidence is the original archive name together with the Data Dynamics download-history/release entry, or the release-specific glossary supplied with that download. A Windows modification date or an acquisition-quarter filename alone is insufficient. Do not redownload or replace the established research data merely to obtain this record.
+The researcher no longer has the original download-history entry or a retained release-specific glossary. Record the exact original publication release and download date as unverified/not retained. A Windows modification date or an acquisition-quarter filename does not prove either. No further search, redownload or replacement of the established data is required merely to recover the date.
+
+This is a reproducibility note, not a finding that the data failed validation. The source hash, structural audits, reviewed retained-field definitions and transformations identify what was actually analyzed. External readiness depends on defensible predictor mapping, outcome interpretation and population coverage; the missing date alone is not an automatic scoring block. Do not mark the entire compatibility assessment as failed solely because release-identification metadata is unavailable.
 
 ## 8. Notebook 16 and external-scoring gates
 
 | Next activity | Protocol / gate |
 |---|---|
-| Notebook 16 design | The 22-feature primary and 24-feature sensitivity proposals are ready for the researcher's review. This record does not start implementation. |
+| Notebook 16 development | Authorized by the researcher: implement the 22-feature primary and separate 24-feature FICO sensitivity using Freddie only. Execute locally and review the generated aggregate bundle before external evaluation. |
 | Companion development | Once approved, use Freddie only: train on 2015–2016, validate/select on 2017, then refit on 2015–2017. Keep the original models and original research populations intact. |
 | Preprocessing | Fit imputation, category handling and any scaling on the applicable Freddie training population only. Freeze ordering and manifests. No Fannie/out-of-time fitting or outcome-based model selection. |
 | Models | Logistic Regression and XGBoost for each approved predictor specification, stored separately from the original 29-feature artifacts. |
 | Outlier handling | Reuse existing documented cleaning and HARP-aware checks. Do not drop or cap historical ratios using the simplified 587-flag count. |
 | Population interpretation | Full Freddie and available Fannie populations differ in sampling and products. Any narrower product-matched population is a separate reviewed comparison, not an automatic change. |
-| Notebook 17 scoring | Requires reviewed release evidence, an approved mapped-target interpretation, approved population/predictor specifications, frozen companion artifacts and explicit evaluation approval. |
+| Notebook 17 scoring | Requires reviewed retained-field mappings, an approved mapped-target interpretation, approved population/predictor specifications, frozen companion artifacts and explicit evaluation approval. Disclose the unretained original download date/publication release; their absence alone does not block scoring. |
 | Generalizability | One acquisition-file subset does not validate the complete Freddie 2018–2023 drift, early-warning or retraining experiment. |
 
-**Recommended disposition:** close the numerical/categorical EDA, raw-snapshot audit and precision follow-up as reviewed. Retain the stated retrospective and population limitations. Complete the download/release evidence item and obtain methodological approval before moving to companion development. External scoring remains unreleased.
+**Disposition:** close the numerical/categorical EDA, raw-snapshot audit and precision follow-up as reviewed. Retain the retrospective, population and provenance limitations. Proceed with authorized Freddie-only companion development in Notebook 16. Review internal development outputs and the external interpretation before Notebook 17. External scoring remains unreleased.
 
-No new notebook, raw-data scan, data correction, model training or scoring was performed to prepare this record. No approval status in an earlier execution manifest was changed.
+Preparing the original 15B record performed no new raw-data scan, data correction, model training or scoring. The subsequent Notebook 16 implementation saves separate artifacts and has been checked with synthetic data; actual research-model development runs on the researcher's local files. No approval status in an earlier execution manifest was changed.
 
 ## 9. Source register
 
